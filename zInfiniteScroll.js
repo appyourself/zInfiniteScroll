@@ -11,11 +11,13 @@
                     handler         = $scope.$eval($attr.zInfiniteScroll),
                     bodyScroll      = $scope.$eval($attr.bodyScroll) === true ? true : false,
                     inverse         = $scope.$eval($attr.inverse) === true ? true : false,
+                    loaderHeight    = $attr.loaderHeight || 0,
                     promise         = null,
                     lastScrolled    = 9999,
                     element         = $element[0],
                     scrollEvent,
-                    isDestorying = false;
+                    isDestorying = false,
+                    muteHandler = false;
 
                 $scope.$on('$destroy', function handleDestroyEvent() {
                     isDestorying = true;
@@ -48,20 +50,30 @@
                 // it will be scrolled once your data loaded
                 function scrollUntilDataReady() {
                     if (isDestorying) return;
-
+                    
                     var scrolled = calculateBarScrolled();
                     // if we have reached the threshold and we scroll up
-                    if (scrolled < lengthThreshold && (scrolled - lastScrolled) < 0 && (element.scrollHeight >= element.clientHeight)) {
+                    if (!muteHandler && (scrolled < lengthThreshold) && ((scrolled - lastScrolled) < 0) && (element.scrollHeight >= element.clientHeight)) {
                         var originalHeight = element.scrollHeight;
                         var handlerCallback = $scope.$apply(handler);
                         if (handlerCallback && typeof handlerCallback.then === 'function') {
-                            handlerCallback.then(function() {
+                            muteHandler = true;
+                            handlerCallback.then(function(data) {
                                 $timeout(function() {
-                                    element.scrollTop = element.scrollHeight - originalHeight;
+                                    if (element.scrollTop <= 0) {
+                                        element.scrollTop = element.scrollHeight - originalHeight - element.scrollTop - loaderHeight;
+                                    } else if (element.scrollTop <= lengthThreshold) {
+                                        element.scrollTop = element.scrollHeight - originalHeight + element.scrollTop - loaderHeight;
+                                    }
+
+                                    $timeout(function() {
+                                        muteHandler = false;
+                                    }, timeThreshold);
                                 });
                             });
                         }
                     }
+
                     lastScrolled = scrolled;
                 }
 
